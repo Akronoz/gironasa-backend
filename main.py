@@ -113,7 +113,8 @@ def _payload_to_point(payload: dict) -> Point:
         if value is not None:
             point = point.field(name, float(value))
 
-    if not fields.get("inverter_power_w") and not fields.get("meter_export_kw"):
+    has_metric = any(value is not None for value in fields.values())
+    if not has_metric:
         raise HTTPException(status_code=422, detail="Payload sin métricas válidas")
 
     return point
