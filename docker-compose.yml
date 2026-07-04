@@ -1,6 +1,14 @@
-# Despliegue estándar: sma-server en localhost:8000 (nginx hace proxy desde fuera).
-# RPi por WireGuard: añade docker-compose.vpn.yml (http://10.8.0.1:8000).
-# Alternativa: red del contenedor WG con docker-compose.wg.yml
+# Producción Gironasa: sma-server comparte red con wg-easy (como antes).
+# API accesible en http://10.8.0.1:8000 desde la RPi (sma-push, iot-gateway).
+#
+# Requisitos:
+#   - Contenedor wg-easy ya en marcha (docker ps | grep -i wg)
+#   - WG_CONTAINER en .env = container_name real (por defecto wg-easy)
+#
+# Despliegue:
+#   docker compose up -d --build
+#
+# Sin wg-easy (solo localhost/nginx): usa docker-compose.standalone.yml
 
 services:
   sma-server:
@@ -9,6 +17,7 @@ services:
     env_file: .env
     environment:
       INFLUX_URL: http://172.17.0.1:8086
-    ports:
-      - "127.0.0.1:8000:8000"
+    network_mode: "container:${WG_CONTAINER:-wg-easy}"
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped

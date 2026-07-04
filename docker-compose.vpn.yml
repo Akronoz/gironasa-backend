@@ -1,8 +1,8 @@
-# Expone sma-server en la IP WireGuard del VPS (RPi: sma-push, iot-gateway).
-# Requiere que 10.8.0.1 exista en el host (ip a | grep wg).
+# Alternativa si WireGuard corre en el HOST (no en contenedor wg-easy).
+# Expone puerto 8000 en 10.8.0.1 además de localhost.
 #
 # Uso:
-#   docker compose -f docker-compose.yml -f docker-compose.vpn.yml up -d --build
+#   docker compose -f docker-compose.standalone.yml -f docker-compose.vpn.yml up -d --build
 
 services:
   sma-server:
