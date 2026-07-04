@@ -137,6 +137,21 @@ def ingest_telemetry(
         logger.error("Influx write IoT falló: %s", exc)
         raise HTTPException(status_code=502, detail=f"Error escribiendo en InfluxDB: {exc}") from exc
 
+    by_device: dict[str, set[str]] = {}
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        dev = str(event.get("device_id", ""))
+        met = str(event.get("metric", ""))
+        if dev and met:
+            by_device.setdefault(dev, set()).add(met)
+    logger.info(
+        "IoT telemetría → Influx: %d puntos, bucket=%s, %s",
+        len(points),
+        _influx_bucket,
+        ", ".join(f"{d}:[{','.join(sorted(m))}]" for d, m in sorted(by_device.items())),
+    )
+
     return {"ok": True, "written": len(points)}
 
 
