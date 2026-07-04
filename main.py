@@ -28,13 +28,16 @@ from fastapi import FastAPI, Header, HTTPException
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 
+from iot_routes import configure_iot_routes, router as iot_router
+
 API_KEY = os.environ.get("SMA_API_KEY", "").strip()
 INFLUX_URL = os.environ.get("INFLUX_URL", "http://localhost:8086").strip()
 INFLUX_TOKEN = os.environ.get("INFLUX_TOKEN", "").strip()
 INFLUX_ORG = os.environ.get("INFLUX_ORG", "").strip()
 INFLUX_BUCKET = os.environ.get("INFLUX_BUCKET", "sma").strip()
 
-app = FastAPI(title="SMA Ingest API", version="1.0")
+app = FastAPI(title="SMA Ingest API", version="1.1")
+app.include_router(iot_router)
 
 _influx: InfluxDBClient | None = None
 _write_api = None
@@ -86,6 +89,14 @@ def _verify_api_key(header_key: str | None) -> None:
         raise HTTPException(status_code=500, detail="SMA_API_KEY no configurada")
     if header_key != API_KEY:
         raise HTTPException(status_code=401, detail="API key inválida")
+
+
+configure_iot_routes(
+    get_write_api=_get_write_api,
+    influx_org=INFLUX_ORG,
+    influx_bucket=INFLUX_BUCKET,
+    verify_api_key=_verify_api_key,
+)
 
 
 def _payload_to_point(payload: dict) -> Point:
