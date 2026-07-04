@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -85,7 +85,20 @@ def _coerce_numeric(value: Any, payload: Any) -> float | int | None:
         return None
 
 
-def _telemetry_to_point(event: dict) -> Point | None:
+def _ingest_timestamp(event: dict, *, offset_us: int = 0) -> datetime:
+    """Hora de ingesta en UTC (igual que sma_plant).
+
+    No usar received_at de la RPi como _time: suele venir en hora local sin zona
+    y Flux con stop=now() no devuelve puntos fechados en el futuro.
+    """
+    return datetime.now(timezone.utc) + timedelta(microseconds=offset_us)
+
+
+def _telemetry_to_point(
+    event: dict,
+    *,
+    offset_us: int = 0,
+) -> Point | None:
     device_id = str(event.get("device_id", "")).strip()
     if not device_id:
         return None
@@ -99,7 +112,7 @@ def _telemetry_to_point(event: dict) -> Point | None:
         Point("iot_telemetry")
         .tag("device_id", device_id)
         .tag("metric", metric)
-        .time(_parse_event_time(event))
+        .time(_ingest_timestamp(event, offset_us=offset_us))
     )
     if channel is not None:
         point = point.tag("channel", str(channel))
@@ -134,10 +147,10 @@ def ingest_telemetry(
         raise HTTPException(status_code=422, detail="Se requiere events[]")
 
     points = []
-    for event in events:
+    for index, event in enumerate(events):
         if not isinstance(event, dict):
             continue
-        point = _telemetry_to_point(event)
+        point = _telemetry_to_point(event, offset_us=index)
         if point is not None:
             points.append(point)
 
