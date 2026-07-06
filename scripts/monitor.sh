@@ -25,7 +25,7 @@ while true; do
   PLANT=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('plant_timestamp',''))" 2>/dev/null)
 
   if [ "$TIME" != "$LAST_TIME" ]; then
-    echo "[$NOW] NUEVO DATO | host=$HOST | prod=${PROD}W | consumo=${CONS}kW | planta=$PLANT | ingesta=$TIME"
+    echo "[$NOW] NUEVO DATO | host=$HOST | prod=${PROD}kW | consumo=${CONS}kW | planta=$PLANT | ingesta=$TIME"
     LAST_TIME="$TIME"
   else
     echo "[$NOW] sin cambios (último: $TIME)"
