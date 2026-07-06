@@ -258,8 +258,11 @@ def get_firmware_manifest(
     _require_auth(x_api_key)
     manifest = _firmware_store.get()
     version = manifest.get("version")
+    version_text = version.strip() if isinstance(version, str) else ""
+    if not version_text:
+        version_text = os.environ.get("FIRMWARE_LATEST_VERSION", "").strip()
     return {
-        "version": version if isinstance(version, str) and version.strip() else None,
+        "version": version_text or None,
         "updated_at": manifest.get("updated_at"),
     }
 
