@@ -36,7 +36,8 @@ INFLUX_TOKEN = os.environ.get("INFLUX_TOKEN", "").strip()
 INFLUX_ORG = os.environ.get("INFLUX_ORG", "").strip()
 INFLUX_BUCKET = os.environ.get("INFLUX_BUCKET", "sma").strip()
 
-app = FastAPI(title="SMA Ingest API", version="1.1")
+app = FastAPI(title="SMA Ingest API", version="1.2")
+INFLUX_PRODUCTION_FIELD = "inverter_power_kw"
 app.include_router(iot_router)
 
 _influx: InfluxDBClient | None = None
@@ -117,7 +118,7 @@ def _payload_to_point(payload: dict) -> Point:
 
     inverter_power_w = _metric(payload, "inverter_power", "value")
     fields: dict[str, float | None] = {
-        "inverter_power_kw": (
+        INFLUX_PRODUCTION_FIELD: (
             inverter_power_w / 1000.0 if inverter_power_w is not None else None
         ),
         "meter_import_kw": _metric(payload, "meter_import", "value"),
@@ -163,6 +164,8 @@ def ready() -> dict[str, Any]:
         "influx_org_set": bool(INFLUX_ORG),
         "influx_token_set": bool(INFLUX_TOKEN),
         "influx_bucket": INFLUX_BUCKET,
+        "influx_production_field": INFLUX_PRODUCTION_FIELD,
+        "influx_power_unit": "kW",
     }
 
 
