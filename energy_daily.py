@@ -18,7 +18,8 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 MEASUREMENT_RAW = "sma_plant"
 MEASUREMENT_DAILY = "sma_energy_day"
 
-FIELD_PRODUCTION_W = "inverter_power_w"
+FIELD_PRODUCTION_KW = "inverter_power_kw"
+FIELD_PRODUCTION_W_LEGACY = "inverter_power_w"
 FIELD_CONSUMPTION_KW = "site_consumption_kw"
 FIELD_EXPORT_KW = "meter_balance_kw"
 
@@ -89,9 +90,26 @@ def integrate_signed_kwh(points: list[tuple[datetime, float]]) -> float:
 
 
 def _scale_raw(field: str, value: float) -> float:
-    if field == FIELD_PRODUCTION_W:
+    if field == FIELD_PRODUCTION_W_LEGACY:
         return value / 1000.0
     return value
+
+
+def _query_production_series(
+    client: InfluxDBClient,
+    org: str,
+    bucket: str,
+    start: datetime,
+    stop: datetime,
+) -> list[tuple[datetime, float]]:
+    production = _query_field_series(
+        client, org, bucket, FIELD_PRODUCTION_KW, start, stop
+    )
+    if production:
+        return production
+    return _query_field_series(
+        client, org, bucket, FIELD_PRODUCTION_W_LEGACY, start, stop
+    )
 
 
 def _query_field_series(
@@ -136,9 +154,7 @@ def compute_daily_energy(
     if day_stop <= start:
         return None
 
-    production = _query_field_series(
-        client, org, bucket, FIELD_PRODUCTION_W, start, day_stop
-    )
+    production = _query_production_series(client, org, bucket, start, day_stop)
     consumption = _query_field_series(
         client, org, bucket, FIELD_CONSUMPTION_KW, start, day_stop
     )

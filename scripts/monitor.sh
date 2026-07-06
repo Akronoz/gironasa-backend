@@ -19,7 +19,7 @@ while true; do
   }
 
   TIME=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('time',''))" 2>/dev/null)
-  PROD=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('inverter_power_w','?'))" 2>/dev/null)
+  PROD=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); v=d.get('inverter_power_kw'); print(v if v is not None else (float(d.get('inverter_power_w',0))/1000 if d.get('inverter_power_w') is not None else '?'))" 2>/dev/null)
   CONS=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('site_consumption_kw','?'))" 2>/dev/null)
   HOST=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('host','?'))" 2>/dev/null)
   PLANT=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('plant_timestamp',''))" 2>/dev/null)

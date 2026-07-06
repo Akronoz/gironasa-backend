@@ -115,8 +115,11 @@ def _payload_to_point(payload: dict) -> Point:
     if plant_ts:
         point = point.field("plant_timestamp", plant_ts)
 
-    fields: dict[str, float] = {
-        "inverter_power_w": _metric(payload, "inverter_power", "value"),
+    inverter_power_w = _metric(payload, "inverter_power", "value")
+    fields: dict[str, float | None] = {
+        "inverter_power_kw": (
+            inverter_power_w / 1000.0 if inverter_power_w is not None else None
+        ),
         "meter_import_kw": _metric(payload, "meter_import", "value"),
         "meter_export_kw": _metric(payload, "meter_export", "value"),
         "meter_balance_kw": _metric(payload, "meter_balance", "value"),
