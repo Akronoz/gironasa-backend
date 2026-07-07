@@ -4,6 +4,7 @@
 #   bash scripts/purge_iot_device.sh homeassistant niquel
 #   bash scripts/purge_iot_device.sh --influx-only homeassistant
 #   bash scripts/purge_iot_device.sh --registry-only niquel
+#   bash scripts/purge_iot_device.sh --config-only niquel
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
