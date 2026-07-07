@@ -57,6 +57,17 @@ class DevicesStore:
             self._save()
             return deepcopy(self._devices[device_id])
 
+    def remove(self, device_id: str) -> bool:
+        device_id = device_id.strip()
+        if not device_id:
+            raise ValueError("device_id vacío")
+        with self._lock:
+            if device_id not in self._devices:
+                return False
+            del self._devices[device_id]
+            self._save()
+            return True
+
     def update_name(self, device_id: str, name: str | None) -> dict[str, Any]:
         device_id = device_id.strip()
         with self._lock:

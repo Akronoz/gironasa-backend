@@ -94,6 +94,7 @@ def _verify_api_key(header_key: str | None) -> None:
 
 configure_iot_routes(
     get_write_api=_get_write_api,
+    get_influx_client=_get_client,
     influx_org=INFLUX_ORG,
     influx_bucket=INFLUX_BUCKET,
     verify_api_key=_verify_api_key,

@@ -31,6 +31,7 @@ _devices_store = DevicesStore(Path(_devices_path) if _devices_path else None)
 _firmware_store = FirmwareManifestStore(Path(_firmware_path) if _firmware_path else None)
 
 _get_write_api: Callable[[], Any] | None = None
+_get_influx_client: Callable[[], Any] | None = None
 _influx_org = ""
 _influx_bucket = ""
 _verify_api_key: Callable[[str | None], None] | None = None
@@ -39,15 +40,28 @@ _verify_api_key: Callable[[str | None], None] | None = None
 def configure_iot_routes(
     *,
     get_write_api: Callable[[], Any],
+    get_influx_client: Callable[[], Any] | None = None,
     influx_org: str,
     influx_bucket: str,
     verify_api_key: Callable[[str | None], None],
 ) -> None:
-    global _get_write_api, _influx_org, _influx_bucket, _verify_api_key
+    global _get_write_api, _get_influx_client, _influx_org, _influx_bucket, _verify_api_key
     _get_write_api = get_write_api
+    _get_influx_client = get_influx_client
     _influx_org = influx_org
     _influx_bucket = influx_bucket
     _verify_api_key = verify_api_key
+
+
+def _purge_device_telemetry(device_id: str) -> None:
+    if _get_influx_client is None:
+        raise HTTPException(status_code=500, detail="InfluxDB no configurado para borrado")
+    client = _get_influx_client()
+    delete_api = client.delete_api()
+    start = datetime(1970, 1, 1, tzinfo=timezone.utc).isoformat()
+    stop = datetime.now(timezone.utc).isoformat()
+    predicate = f'_measurement="iot_telemetry" AND device_id="{device_id}"'
+    delete_api.delete(start, stop, predicate, _influx_bucket, _influx_org)
 
 
 def _require_auth(x_api_key: str | None) -> None:
@@ -326,6 +340,42 @@ def rename_device(
     name_str = str(name).strip() if name is not None else None
     device = _devices_store.update_name(device_id, name_str)
     return {"ok": True, "device": device}
+
+
+@router.delete("/devices/{device_id}")
+def delete_device(
+    device_id: str,
+    purge_influx: bool = True,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> dict[str, Any]:
+    _require_auth(x_api_key)
+    device_id = device_id.strip()
+    if not device_id:
+        raise HTTPException(status_code=422, detail="device_id requerido")
+
+    removed_registry = _devices_store.remove(device_id)
+    purged_influx = False
+    if purge_influx:
+        try:
+            _purge_device_telemetry(device_id)
+            purged_influx = True
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception("Influx purge failed for %s", device_id)
+            raise HTTPException(
+                status_code=502, detail=f"No se pudo borrar telemetría Influx: {exc}"
+            ) from exc
+
+    if not removed_registry and not purged_influx:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+
+    return {
+        "ok": True,
+        "device_id": device_id,
+        "removed_registry": removed_registry,
+        "purged_influx": purged_influx,
+    }
 
 
 @router.put("/machines/config")
