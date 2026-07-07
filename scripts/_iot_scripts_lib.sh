@@ -30,21 +30,10 @@ resolve_sma_base_url() {
 
 purge_device_influx_direct() {
   local device_id="$1"
-  local org="${INFLUX_ORG:-Gironasa}"
-  local bucket="${INFLUX_BUCKET:-sma}"
-  local url="${INFLUX_URL:-http://127.0.0.1:8086}"
-  local token="${INFLUX_TOKEN:-}"
-  local stop
-  stop="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/purge_iot_device.py" --influx-only "$device_id"
+}
 
-  if [[ -z "$token" ]]; then
-    echo "ERROR: falta INFLUX_TOKEN en .env" >&2
-    return 1
-  fi
-
-  curl -sS -X POST \
-    "${url}/api/v2/delete?org=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$org'))")&bucket=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$bucket'))")" \
-    -H "Authorization: Token ${token}" \
-    -H "Content-Type: application/json" \
-    -d "{\"start\":\"1970-01-01T00:00:00Z\",\"stop\":\"${stop}\",\"predicate\":\"_measurement=\\\"iot_telemetry\\\" AND device_id=\\\"${device_id}\\\"\"}"
+purge_device_registry_direct() {
+  local device_id="$1"
+  python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/purge_iot_device.py" --registry-only "$device_id"
 }
