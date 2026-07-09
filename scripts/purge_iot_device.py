@@ -153,6 +153,79 @@ def purge_registry(device_id: str, root: Path) -> bool:
     return True
 
 
+def purge_machines_config_via_api(device_id: str, env: dict[str, str]) -> bool:
+    """Remove device from the live in-memory machines config (what the web reads)."""
+    api_key = env.get("SMA_API_KEY", "").strip()
+    base = resolve_api_base(env)
+    if not api_key or not base:
+        print("  API machines config: skipped (no SMA_API_KEY or /health unavailable)")
+        return False
+
+    headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(f"{base}/api/v1/iot/machines/config", headers=headers),
+            timeout=30,
+        ) as resp:
+            raw = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        print(f"  API machines config GET FAIL HTTP {exc.code}: {detail}", file=sys.stderr)
+        return False
+    except OSError as exc:
+        print(f"  API machines config GET FAIL: {exc}", file=sys.stderr)
+        return False
+
+    if not isinstance(raw, dict):
+        print("  API machines config: unexpected response")
+        return False
+
+    machines = raw.get("machines")
+    if not isinstance(machines, list):
+        print("  API machines config: no machines list")
+        return False
+
+    before = len(machines)
+    filtered = [m for m in machines if machine_device_id(m) != device_id]
+    removed = before - len(filtered)
+    if removed == 0:
+        print(f"  API machines config: {device_id} not in live config")
+        return False
+
+    payload: dict[str, Any] = {"machines": filtered}
+    ambient = raw.get("ambientTemperatureSource")
+    if isinstance(ambient, dict):
+        amb_id = str(ambient.get("deviceId") or ambient.get("device_id") or "").strip()
+        if amb_id == device_id:
+            payload["ambientTemperatureSource"] = None
+        else:
+            payload["ambientTemperatureSource"] = ambient
+
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(
+                f"{base}/api/v1/iot/machines/config",
+                data=body,
+                method="PUT",
+                headers=headers,
+            ),
+            timeout=30,
+        ) as resp:
+            print(
+                f"  API machines config OK: removed {removed} entry/entries for {device_id} "
+                f"(HTTP {resp.status})"
+            )
+            return True
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        print(f"  API machines config PUT FAIL HTTP {exc.code}: {detail}", file=sys.stderr)
+        return False
+    except OSError as exc:
+        print(f"  API machines config PUT FAIL: {exc}", file=sys.stderr)
+        return False
+
+
 def purge_machines_config(device_id: str, root: Path) -> bool:
     path = root / "data" / "machines_config.json"
     if not path.is_file():
@@ -225,7 +298,18 @@ def purge_all(device_id: str, root: Path, env: dict[str, str]) -> bool:
         ok = purge_registry(device_id, root) and ok
     else:
         purge_registry(device_id, root)
-    ok = purge_machines_config(device_id, root) and ok
+
+    # Live backend keeps machines config in memory; file-only edits are not enough.
+    if not purge_machines_config_via_api(device_id, env):
+        purge_machines_config(device_id, root)
+        print(
+            "  Hint: if the web still shows the device, run: docker compose restart backend",
+            file=sys.stderr,
+        )
+    else:
+        purge_machines_config(device_id, root)
+
+    ok = True
 
     remaining = count_influx_points(device_id, env)
     if remaining is None:
@@ -263,6 +347,7 @@ def main() -> int:
             ok = purge_registry(device_id, root) and ok
             continue
         if args.config_only:
+            ok = purge_machines_config_via_api(device_id, env) and ok
             ok = purge_machines_config(device_id, root) and ok
             continue
         if args.influx_only:
