@@ -243,12 +243,18 @@ async def create_command(
     if action == "ota_update" and url is not None and not url.startswith("http://"):
         raise HTTPException(status_code=422, detail="ota_update url debe ser http:// (LAN)")
 
+    mapping = payload.get("mapping")
+    if action == "set_hw_mapping":
+        if not isinstance(mapping, dict) or not mapping:
+            raise HTTPException(status_code=422, detail="set_hw_mapping requiere mapping")
+
     command = _command_store.enqueue(
         device_id=device_id,
         action=action,
         output=output_int,
         state=state_bool,
         url=url,
+        mapping=mapping if isinstance(mapping, dict) else None,
     )
 
     public = command.to_public()

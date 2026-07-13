@@ -60,6 +60,7 @@ class IotCommand:
     output: int | None = None
     state: bool | None = None
     url: str = ""
+    mapping: dict[str, Any] | None = None
     detail: str = ""
     updated_at: str = ""
 
@@ -71,6 +72,8 @@ class IotCommand:
             data.pop("state", None)
         if not data.get("url"):
             data.pop("url", None)
+        if not data.get("mapping"):
+            data.pop("mapping", None)
         if not data.get("detail"):
             data.pop("detail", None)
         if not data.get("updated_at"):
@@ -114,6 +117,7 @@ class CommandStore:
         for item in raw:
             if not isinstance(item, dict):
                 continue
+            mapping = item.get("mapping")
             cmd = IotCommand(
                 id=str(item.get("id", "")),
                 device_id=str(item.get("device_id", "")),
@@ -123,6 +127,7 @@ class CommandStore:
                 output=item.get("output"),
                 state=item.get("state"),
                 url=str(item.get("url", "")),
+                mapping=mapping if isinstance(mapping, dict) else None,
                 detail=str(item.get("detail", "")),
                 updated_at=str(item.get("updated_at", "")),
             )
@@ -209,6 +214,7 @@ class CommandStore:
         output: int | None = None,
         state: bool | None = None,
         url: str | None = None,
+        mapping: dict[str, Any] | None = None,
     ) -> IotCommand:
         now_iso = self._now().isoformat()
         command = IotCommand(
@@ -220,6 +226,7 @@ class CommandStore:
             output=output,
             state=state,
             url=(url or "").strip(),
+            mapping=mapping,
         )
         with self._lock:
             self._maintain_locked()
