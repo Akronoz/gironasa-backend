@@ -14,6 +14,10 @@ DEFAULT_CONFIG = Path(__file__).with_name("data") / "machines_config.json"
 DEFAULT_MACHINES: dict[str, Any] = {"machines": []}
 
 
+def machine_device_id(entry: dict[str, Any]) -> str:
+    return str(entry.get("device_id") or entry.get("deviceId") or entry.get("id") or "").strip()
+
+
 def _normalize_ambient_source(source: Any) -> dict[str, str] | None:
     if not isinstance(source, dict):
         return None
@@ -72,3 +76,25 @@ class MachinesConfigStore:
                 self._data["ambientTemperatureSource"] = deepcopy(previous_ambient)
             self._save()
             return deepcopy(self._data)
+
+    def remove_by_device_id(self, device_id: str) -> int:
+        device_id = device_id.strip()
+        if not device_id:
+            return 0
+        with self._lock:
+            machines = self._data.get("machines")
+            if not isinstance(machines, list):
+                return 0
+            before = len(machines)
+            machines[:] = [m for m in machines if machine_device_id(m) != device_id]
+            removed = before - len(machines)
+
+            ambient = self._data.get("ambientTemperatureSource")
+            if isinstance(ambient, dict):
+                amb_id = str(ambient.get("deviceId") or ambient.get("device_id") or "").strip()
+                if amb_id == device_id:
+                    self._data.pop("ambientTemperatureSource", None)
+
+            if removed:
+                self._save()
+            return removed

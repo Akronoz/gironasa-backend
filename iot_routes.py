@@ -414,6 +414,7 @@ def delete_device(
         raise HTTPException(status_code=422, detail="device_id requerido")
 
     removed_registry = _devices_store.remove(device_id)
+    removed_from_config = _machines_store.remove_by_device_id(device_id)
     purged_influx = False
     if purge_influx:
         try:
@@ -427,13 +428,14 @@ def delete_device(
                 status_code=502, detail=f"No se pudo borrar telemetría Influx: {exc}"
             ) from exc
 
-    if not removed_registry and not purged_influx:
+    if not removed_registry and not purged_influx and not removed_from_config:
         raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
 
     return {
         "ok": True,
         "device_id": device_id,
         "removed_registry": removed_registry,
+        "removed_from_config": removed_from_config,
         "purged_influx": purged_influx,
     }
 
