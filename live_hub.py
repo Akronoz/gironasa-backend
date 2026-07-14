@@ -38,9 +38,24 @@ class LiveEventHub:
 live_hub = LiveEventHub()
 
 
+def _resolve_io_metric(event: dict[str, Any]) -> str | None:
+    """Bridge uses metric=output_1; accept base names and category fallback."""
+    metric = str(event.get("metric", "")).strip().lower()
+    category = str(event.get("category", "")).strip().lower()
+
+    if metric in IO_LIVE_METRICS:
+        return metric
+    if category in IO_LIVE_METRICS:
+        return category
+    for base in IO_LIVE_METRICS:
+        if metric.startswith(f"{base}_"):
+            return base
+    return None
+
+
 def io_event_from_telemetry(event: dict[str, Any]) -> dict[str, Any] | None:
-    metric = str(event.get("metric", event.get("category", ""))).strip()
-    if metric not in IO_LIVE_METRICS:
+    metric = _resolve_io_metric(event)
+    if metric is None:
         return None
 
     device_id = str(event.get("device_id", "")).strip()
