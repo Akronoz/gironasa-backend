@@ -105,11 +105,12 @@ def main() -> None:
             else:
                 written += 1
                 logger.info(
-                    "%s: prod=%.1f cons=%.1f export_net=%.1f peak=%.1f kW",
+                    "%s: prod=%.1f cons=%.1f export=%.1f import=%.1f peak=%.1f kW",
                     ymd,
                     result.production_kwh,
                     result.consumption_kwh,
-                    result.export_net_kwh,
+                    result.export_kwh,
+                    result.import_kwh,
                     result.peak_production_kw,
                 )
 

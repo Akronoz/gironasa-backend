@@ -21,10 +21,14 @@ MEASUREMENT_DAILY = "sma_energy_day"
 FIELD_PRODUCTION_KW = "inverter_power_kw"
 FIELD_PRODUCTION_W_LEGACY = "inverter_power_w"
 FIELD_CONSUMPTION_KW = "site_consumption_kw"
-FIELD_EXPORT_KW = "meter_balance_kw"
+FIELD_GRID_EXPORT_KW = "meter_export_kw"
+FIELD_GRID_IMPORT_KW = "meter_import_kw"
+FIELD_BALANCE_KW = "meter_balance_kw"
 
 FIELD_PRODUCTION_KWH = "production_kwh"
 FIELD_CONSUMPTION_KWH = "consumption_kwh"
+FIELD_EXPORT_KWH = "export_kwh"
+FIELD_IMPORT_KWH = "import_kwh"
 FIELD_EXPORT_NET_KWH = "export_net_kwh"
 FIELD_PEAK_PRODUCTION_KW = "peak_production_kw"
 
@@ -34,6 +38,8 @@ class DailyEnergy:
     ymd: str
     production_kwh: float
     consumption_kwh: float
+    export_kwh: float
+    import_kwh: float
     export_net_kwh: float
     peak_production_kw: float
 
@@ -158,19 +164,26 @@ def compute_daily_energy(
     consumption = _query_field_series(
         client, org, bucket, FIELD_CONSUMPTION_KW, start, day_stop
     )
-    export_pts = _query_field_series(
-        client, org, bucket, FIELD_EXPORT_KW, start, day_stop
+    grid_export = _query_field_series(
+        client, org, bucket, FIELD_GRID_EXPORT_KW, start, day_stop
+    )
+    grid_import = _query_field_series(
+        client, org, bucket, FIELD_GRID_IMPORT_KW, start, day_stop
     )
 
-    if not production and not consumption and not export_pts:
+    if not production and not consumption and not grid_export and not grid_import:
         return None
 
+    export_kwh = integrate_kwh(grid_export)
+    import_kwh = integrate_kwh(grid_import)
     peak = max((v for _, v in production), default=0.0)
     return DailyEnergy(
         ymd=ymd,
         production_kwh=integrate_kwh(production),
         consumption_kwh=integrate_kwh(consumption),
-        export_net_kwh=integrate_signed_kwh(export_pts),
+        export_kwh=export_kwh,
+        import_kwh=import_kwh,
+        export_net_kwh=export_kwh - import_kwh,
         peak_production_kw=peak,
     )
 
@@ -183,6 +196,8 @@ def daily_energy_to_point(energy: DailyEnergy, host: str = "gironasa") -> Point:
         .time(ts)
         .field(FIELD_PRODUCTION_KWH, float(energy.production_kwh))
         .field(FIELD_CONSUMPTION_KWH, float(energy.consumption_kwh))
+        .field(FIELD_EXPORT_KWH, float(energy.export_kwh))
+        .field(FIELD_IMPORT_KWH, float(energy.import_kwh))
         .field(FIELD_EXPORT_NET_KWH, float(energy.export_net_kwh))
         .field(FIELD_PEAK_PRODUCTION_KW, float(energy.peak_production_kw))
     )
